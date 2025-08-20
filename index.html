@@ -4,14 +4,10 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Phaser 3 Platformer</title>
-  <!-- Phaser 3 from CDN -->
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.js"></script>
   <style>
-    html, body {
-      margin: 0; padding: 0; background:#111; color:#eee; font-family: system-ui, Arial, sans-serif;
-    }
+    html, body { margin:0; padding:0; background:#111; }
     #game-container { display:flex; align-items:center; justify-content:center; height:100vh; }
-    canvas { box-shadow: 0 10px 30px rgba(0,0,0,.6); border-radius: 10px; }
   </style>
 </head>
 <body>
@@ -22,34 +18,38 @@
     const WORLD_WIDTH = 2400;
     const WORLD_HEIGHT = 1080;
 
-    const PLAYER = {
-      speed: 220,
-      jump: 520,
-      spawn: { x: 120, y: WORLD_HEIGHT - 180 }
-    };
-
+    const PLAYER = { speed: 220, jump: 520, spawn: { x: 120, y: WORLD_HEIGHT - 180 } };
     const ENEMY = { speed: 100 };
 
     class MainScene extends Phaser.Scene {
       constructor() { super('MainScene'); }
 
       preload() {
-        // Load art from local repo
         this.load.image('sky', 'assets/backgrounds/sky.png');
         this.load.image('platform', 'assets/sprites/platform.png');
 
-        // Adjust frame sizes to your spritesheets
-        this.load.spritesheet('player', 'assets/sprites/player.png', { frameWidth: 32, frameHeight: 48 });
-        this.load.spritesheet('enemy', 'assets/sprites/enemy.png', { frameWidth: 32, frameHeight: 32 });
+        // If player.png is a sheet → adjust these!
+        this.load.spritesheet('player', 'assets/sprites/player.png', {
+          frameWidth: 32,   // CHANGE: must match actual frame width
+          frameHeight: 48   // CHANGE: must match actual frame height
+        });
+
+        // If enemy.png is also sheet
+        this.load.spritesheet('enemy', 'assets/sprites/enemy.png', {
+          frameWidth: 32,   // CHANGE: actual width of each frame
+          frameHeight: 32   // CHANGE: actual height
+        });
       }
 
       create() {
-        // Background
-        this.add.image(0, 0, 'sky').setOrigin(0,0).setDisplaySize(WORLD_WIDTH, WORLD_HEIGHT);
+        this.add.image(0,0,'sky').setOrigin(0,0).setDisplaySize(WORLD_WIDTH, WORLD_HEIGHT);
 
         // Platforms
         this.platforms = this.physics.add.staticGroup();
-        this.platforms.create(WORLD_WIDTH/2, WORLD_HEIGHT - 40, 'platform').setScale(WORLD_WIDTH/400, 2).refreshBody();
+        const groundCount = Math.ceil(WORLD_WIDTH / 64); // assume platform.png ~64px wide
+        for (let i=0; i<groundCount; i++) {
+          this.platforms.create(i*64+32, WORLD_HEIGHT-20, 'platform').setScale(1).refreshBody();
+        }
         this.platforms.create(420,  WORLD_HEIGHT - 180, 'platform');
         this.platforms.create(760,  WORLD_HEIGHT - 270, 'platform');
         this.platforms.create(1120, WORLD_HEIGHT - 360, 'platform');
@@ -62,7 +62,6 @@
         this.player.setBounce(0.1).setCollideWorldBounds(true);
         this.player.body.setGravityY(900);
 
-        // Player animations
         this.anims.create({ key: 'left', frames: this.anims.generateFrameNumbers('player', { start: 0, end: 3 }), frameRate: 10, repeat: -1 });
         this.anims.create({ key: 'turn', frames: [ { key: 'player', frame: 4 } ], frameRate: 20 });
         this.anims.create({ key: 'right', frames: this.anims.generateFrameNumbers('player', { start: 5, end: 8 }), frameRate: 10, repeat: -1 });
@@ -74,13 +73,13 @@
         this.enemy.patrol = { minX: 650, maxX: 870, speed: ENEMY.speed };
         this.enemy.setVelocityX(this.enemy.patrol.speed);
 
-        // Enemy animation
         this.anims.create({ key: 'enemy-walk', frames: this.anims.generateFrameNumbers('enemy', { start: 0, end: 3 }), frameRate: 6, repeat: -1 });
         this.enemy.play('enemy-walk');
 
-        // Collisions
+        // Physics
         this.physics.add.collider(this.player, this.platforms);
         this.physics.add.collider(this.enemy, this.platforms);
+
         this.physics.add.overlap(this.player, this.enemy, () => this.respawnPlayer(), null, this);
 
         // Camera
@@ -89,58 +88,29 @@
 
         // Controls
         this.cursors = this.input.keyboard.createCursorKeys();
-        this.keys = this.input.keyboard.addKeys({
-          left: Phaser.Input.Keyboard.KeyCodes.A,
-          right: Phaser.Input.Keyboard.KeyCodes.D,
-          jump: Phaser.Input.Keyboard.KeyCodes.SPACE
-        });
-
-        // HUD
-        this.add.text(16, 16, 'Controls: ←/→ or A/D, Space to jump', { fontSize: '14px', fontFamily: 'monospace', color: '#fff' }).setScrollFactor(0);
-
-        // Goal
-        this.goal = this.physics.add.staticSprite(WORLD_WIDTH - 60, WORLD_HEIGHT - 100, 'platform').setScale(0.3,2).refreshBody();
-        this.add.text(WORLD_WIDTH - 120, WORLD_HEIGHT - 160, 'EXIT', { fontFamily:'monospace', fontSize: '16px' }).setOrigin(0, 1);
-        this.physics.add.overlap(this.player, this.goal, () => this.onWin(), null, this);
-
-        this.won = false;
+        this.keys = this.input.keyboard.addKeys({ left:Phaser.Input.Keyboard.KeyCodes.A, right:Phaser.Input.Keyboard.KeyCodes.D, jump:Phaser.Input.Keyboard.KeyCodes.SPACE });
       }
 
-      respawnPlayer() {
-        this.player.setPosition(PLAYER.spawn.x, PLAYER.spawn.y);
-        this.player.setVelocity(0,0);
-      }
-
-      onWin() {
-        if (this.won) return;
-        this.won = true;
-        const msg = this.add.text(0, 0, 'You escaped! 🎉', { fontFamily:'monospace', fontSize:'28px', backgroundColor:'#0b0', padding:{x:10,y:6}});
-        msg.setScrollFactor(0);
-        msg.setPosition(GAME_WIDTH/2 - msg.width/2, GAME_HEIGHT/2 - msg.height/2);
-      }
+      respawnPlayer() { this.player.setPosition(PLAYER.spawn.x, PLAYER.spawn.y); this.player.setVelocity(0,0); }
 
       update() {
         const body = this.player.body;
         const enemyBody = this.enemy.body;
 
-        if (!this.won) {
-          if (this.cursors.left.isDown || this.keys.left.isDown) {
-            body.setVelocityX(-PLAYER.speed);
-            this.player.anims.play('left', true);
-          } else if (this.cursors.right.isDown || this.keys.right.isDown) {
-            body.setVelocityX(PLAYER.speed);
-            this.player.anims.play('right', true);
-          } else {
-            body.setVelocityX(0);
-            this.player.anims.play('turn');
-          }
-
-          if ((this.cursors.up.isDown || this.keys.jump.isDown) && body.blocked.down) {
-            body.setVelocityY(-PLAYER.jump);
-          }
+        if (this.cursors.left.isDown || this.keys.left.isDown) {
+          body.setVelocityX(-PLAYER.speed);
+          this.player.anims.play('left', true);
+        } else if (this.cursors.right.isDown || this.keys.right.isDown) {
+          body.setVelocityX(PLAYER.speed);
+          this.player.anims.play('right', true);
+        } else {
+          body.setVelocityX(0);
+          this.player.anims.play('turn');
+        }
+        if ((this.cursors.up.isDown || this.keys.jump.isDown) && body.blocked.down) {
+          body.setVelocityY(-PLAYER.jump);
         }
 
-        // Enemy patrol
         if (this.enemy.x <= this.enemy.patrol.minX && enemyBody.velocity.x < 0) {
           enemyBody.setVelocityX(this.enemy.patrol.speed);
         } else if (this.enemy.x >= this.enemy.patrol.maxX && enemyBody.velocity.x > 0) {
@@ -149,19 +119,12 @@
       }
     }
 
-    const config = {
+    new Phaser.Game({
       type: Phaser.AUTO,
-      width: GAME_WIDTH,
-      height: GAME_HEIGHT,
-      parent: 'game-container',
-      physics: {
-        default: 'arcade',
-        arcade: { gravity: { y: 0 }, debug: false }
-      },
-      scene: [ MainScene ]
-    };
-
-    new Phaser.Game(config);
+      width: GAME_WIDTH, height: GAME_HEIGHT, parent: 'game-container',
+      physics: { default:'arcade', arcade:{ gravity:{ y:0 }, debug:false } },
+      scene: [MainScene]
+    });
   </script>
 </body>
 </html>
