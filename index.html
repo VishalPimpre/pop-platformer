@@ -1,266 +1,167 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Phaser 3 Level - GitHub Pages</title>
-  <!-- Phaser 3 from CDN (runtime only). No build tools required. -->
-  <script src="https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.min.js"></script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Phaser 3 Platformer</title>
+  <!-- Phaser 3 from CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.js"></script>
   <style>
     html, body {
-      margin: 0;
-      padding: 0;
-      background: #000;
-      height: 100%;
-      overflow: hidden;
+      margin: 0; padding: 0; background:#111; color:#eee; font-family: system-ui, Arial, sans-serif;
     }
-    #game {
-      width: 100%;
-      height: 100%;
-    }
+    #game-container { display:flex; align-items:center; justify-content:center; height:100vh; }
+    canvas { box-shadow: 0 10px 30px rgba(0,0,0,.6); border-radius: 10px; }
   </style>
 </head>
 <body>
-<div id="game"></div>
-<script>
-/*
-  Notes for swapping assets later:
-  - Background: replace assets/backgrounds/sky.png with a different image (ideally same dimensions or larger than the camera view).
-  - Platform: replace assets/sprites/platform.png; if it's a tile, keep its width/height logic consistent below.
-  - Player spritesheet: replace assets/sprites/player.png and set correct frameWidth and frameHeight in preload().
-    Also adjust animation frame ranges below if your sheet uses different indices.
-  - Enemy spritesheet: same as player; set frame sizes and animation frames accordingly.
+  <div id="game-container"></div>
+  <script>
+    const GAME_WIDTH = 960;
+    const GAME_HEIGHT = 540;
+    const WORLD_WIDTH = 2400;
+    const WORLD_HEIGHT = 1080;
 
-  Folder structure expected:
-  - index.html
-  - assets/
-    - backgrounds/sky.png
-    - sprites/platform.png
-    - sprites/player.png
-    - sprites/enemy.png
-*/
+    const PLAYER = {
+      speed: 220,
+      jump: 520,
+      spawn: { x: 120, y: WORLD_HEIGHT - 180 }
+    };
 
-class MainScene extends Phaser.Scene {
-  constructor() {
-    super('MainScene');
-  }
+    const ENEMY = { speed: 100 };
 
-  preload() {
-    // Background image (static)
-    this.load.image('sky', 'assets/backgrounds/sky.png');
+    class MainScene extends Phaser.Scene {
+      constructor() { super('MainScene'); }
 
-    // Platform sprite/tile
-    this.load.image('platform', 'assets/sprites/platform.png');
+      preload() {
+        // Load art from local repo
+        this.load.image('sky', 'assets/backgrounds/sky.png');
+        this.load.image('platform', 'assets/sprites/platform.png');
 
-    // Player spritesheet: set frameWidth/frameHeight to match your sprite frames exactly.
-    // Example sizes shown; replace with the correct values for your sprite sheet.
-    this.load.spritesheet('player', 'assets/sprites/player.png', {
-      frameWidth: 32,    // TODO: set to your player frame width
-      frameHeight: 48    // TODO: set to your player frame height
-    });
-
-    // Enemy spritesheet: also set the correct frame sizes.
-    this.load.spritesheet('enemy', 'assets/sprites/enemy.png', {
-      frameWidth: 32,    // TODO: set to your enemy frame width
-      frameHeight: 32    // TODO: set to your enemy frame height
-    });
-  }
-
-  create() {
-    const width = 800;
-    const height = 600;
-
-    // Add background. For a large background image, you can set scrollFactor to 0 for parallax, or 1 to stick with world.
-    const bg = this.add.image(0, 0, 'sky').setOrigin(0, 0);
-    // If the background isn't the same size as the camera, you can scale it:
-    // bg.setDisplaySize(width, height).setScrollFactor(0);
-
-    // Enable Arcade physics
-    this.physics.world.setBounds(0, 0, 2000, 1200); // Make a larger world than the camera view for scrolling
-
-    // Static platforms group using your platform sprite
-    const platforms = this.physics.add.staticGroup();
-
-    // Helper to add a platform at (x, y) with optional scaleX to stretch horizontally
-    const addPlatform = (x, y, scaleX = 1) => {
-      const p = platforms.create(x, y, 'platform').setOrigin(0, 0).refreshBody();
-      if (scaleX !== 1) {
-        p.setScale(scaleX, 1).refreshBody();
+        // Adjust frame sizes to your spritesheets
+        this.load.spritesheet('player', 'assets/sprites/player.png', { frameWidth: 32, frameHeight: 48 });
+        this.load.spritesheet('enemy', 'assets/sprites/enemy.png', { frameWidth: 32, frameHeight: 32 });
       }
-      return p;
+
+      create() {
+        // Background
+        this.add.image(0, 0, 'sky').setOrigin(0,0).setDisplaySize(WORLD_WIDTH, WORLD_HEIGHT);
+
+        // Platforms
+        this.platforms = this.physics.add.staticGroup();
+        this.platforms.create(WORLD_WIDTH/2, WORLD_HEIGHT - 40, 'platform').setScale(WORLD_WIDTH/400, 2).refreshBody();
+        this.platforms.create(420,  WORLD_HEIGHT - 180, 'platform');
+        this.platforms.create(760,  WORLD_HEIGHT - 270, 'platform');
+        this.platforms.create(1120, WORLD_HEIGHT - 360, 'platform');
+        this.platforms.create(1480, WORLD_HEIGHT - 300, 'platform');
+        this.platforms.create(1800, WORLD_HEIGHT - 220, 'platform');
+        this.platforms.create(2100, WORLD_HEIGHT - 320, 'platform');
+
+        // Player
+        this.player = this.physics.add.sprite(PLAYER.spawn.x, PLAYER.spawn.y, 'player');
+        this.player.setBounce(0.1).setCollideWorldBounds(true);
+        this.player.body.setGravityY(900);
+
+        // Player animations
+        this.anims.create({ key: 'left', frames: this.anims.generateFrameNumbers('player', { start: 0, end: 3 }), frameRate: 10, repeat: -1 });
+        this.anims.create({ key: 'turn', frames: [ { key: 'player', frame: 4 } ], frameRate: 20 });
+        this.anims.create({ key: 'right', frames: this.anims.generateFrameNumbers('player', { start: 5, end: 8 }), frameRate: 10, repeat: -1 });
+
+        // Enemy
+        this.enemy = this.physics.add.sprite(750, WORLD_HEIGHT - 310, 'enemy');
+        this.enemy.body.setGravityY(900);
+        this.enemy.setCollideWorldBounds(true);
+        this.enemy.patrol = { minX: 650, maxX: 870, speed: ENEMY.speed };
+        this.enemy.setVelocityX(this.enemy.patrol.speed);
+
+        // Enemy animation
+        this.anims.create({ key: 'enemy-walk', frames: this.anims.generateFrameNumbers('enemy', { start: 0, end: 3 }), frameRate: 6, repeat: -1 });
+        this.enemy.play('enemy-walk');
+
+        // Collisions
+        this.physics.add.collider(this.player, this.platforms);
+        this.physics.add.collider(this.enemy, this.platforms);
+        this.physics.add.overlap(this.player, this.enemy, () => this.respawnPlayer(), null, this);
+
+        // Camera
+        this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+        this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
+
+        // Controls
+        this.cursors = this.input.keyboard.createCursorKeys();
+        this.keys = this.input.keyboard.addKeys({
+          left: Phaser.Input.Keyboard.KeyCodes.A,
+          right: Phaser.Input.Keyboard.KeyCodes.D,
+          jump: Phaser.Input.Keyboard.KeyCodes.SPACE
+        });
+
+        // HUD
+        this.add.text(16, 16, 'Controls: ←/→ or A/D, Space to jump', { fontSize: '14px', fontFamily: 'monospace', color: '#fff' }).setScrollFactor(0);
+
+        // Goal
+        this.goal = this.physics.add.staticSprite(WORLD_WIDTH - 60, WORLD_HEIGHT - 100, 'platform').setScale(0.3,2).refreshBody();
+        this.add.text(WORLD_WIDTH - 120, WORLD_HEIGHT - 160, 'EXIT', { fontFamily:'monospace', fontSize: '16px' }).setOrigin(0, 1);
+        this.physics.add.overlap(this.player, this.goal, () => this.onWin(), null, this);
+
+        this.won = false;
+      }
+
+      respawnPlayer() {
+        this.player.setPosition(PLAYER.spawn.x, PLAYER.spawn.y);
+        this.player.setVelocity(0,0);
+      }
+
+      onWin() {
+        if (this.won) return;
+        this.won = true;
+        const msg = this.add.text(0, 0, 'You escaped! 🎉', { fontFamily:'monospace', fontSize:'28px', backgroundColor:'#0b0', padding:{x:10,y:6}});
+        msg.setScrollFactor(0);
+        msg.setPosition(GAME_WIDTH/2 - msg.width/2, GAME_HEIGHT/2 - msg.height/2);
+      }
+
+      update() {
+        const body = this.player.body;
+        const enemyBody = this.enemy.body;
+
+        if (!this.won) {
+          if (this.cursors.left.isDown || this.keys.left.isDown) {
+            body.setVelocityX(-PLAYER.speed);
+            this.player.anims.play('left', true);
+          } else if (this.cursors.right.isDown || this.keys.right.isDown) {
+            body.setVelocityX(PLAYER.speed);
+            this.player.anims.play('right', true);
+          } else {
+            body.setVelocityX(0);
+            this.player.anims.play('turn');
+          }
+
+          if ((this.cursors.up.isDown || this.keys.jump.isDown) && body.blocked.down) {
+            body.setVelocityY(-PLAYER.jump);
+          }
+        }
+
+        // Enemy patrol
+        if (this.enemy.x <= this.enemy.patrol.minX && enemyBody.velocity.x < 0) {
+          enemyBody.setVelocityX(this.enemy.patrol.speed);
+        } else if (this.enemy.x >= this.enemy.patrol.maxX && enemyBody.velocity.x > 0) {
+          enemyBody.setVelocityX(-this.enemy.patrol.speed);
+        }
+      }
+    }
+
+    const config = {
+      type: Phaser.AUTO,
+      width: GAME_WIDTH,
+      height: GAME_HEIGHT,
+      parent: 'game-container',
+      physics: {
+        default: 'arcade',
+        arcade: { gravity: { y: 0 }, debug: false }
+      },
+      scene: [ MainScene ]
     };
 
-    // Ground and some elevated platforms
-    addPlatform(0, 560, 5);      // ground platform (scaled wide)
-    addPlatform(500, 560, 5);    // extend ground to the right
-    addPlatform(300, 420, 1.5);
-    addPlatform(650, 340, 1.5);
-    addPlatform(1000, 480, 2);
-    addPlatform(1400, 380, 2);
-    addPlatform(1700, 300, 1.2);
-
-    // Player
-    this.player = this.physics.add.sprite(100, 450, 'player');
-    this.player.setBounce(0.1);
-    this.player.setCollideWorldBounds(true);
-
-    // Player animations
-    // Adjust frame ranges to your spritesheet indexing.
-    // Common pattern: 0 = idle frame, 1-3 = walk, 4 = jump, etc.
-    this.anims.create({
-      key: 'player-idle',
-      frames: [{ key: 'player', frame: 0 }],
-      frameRate: 1,
-      repeat: -1
-    });
-
-    this.anims.create({
-      key: 'player-walk',
-      frames: this.anims.generateFrameNumbers('player', { start: 1, end: 3 }),
-      frameRate: 10,
-      repeat: -1
-    });
-
-    this.anims.create({
-      key: 'player-jump',
-      frames: [{ key: 'player', frame: 4 }],
-      frameRate: 1,
-      repeat: -1
-    });
-
-    // Enemy
-    this.enemy = this.physics.add.sprite(1100, 440, 'enemy');
-    this.enemy.setCollideWorldBounds(true);
-    this.enemy.setBounce(0);
-    this.enemy.body.setMaxVelocity(150, 1000);
-
-    // Enemy animations (adjust frames to your sheet)
-    this.anims.create({
-      key: 'enemy-walk',
-      frames: this.anims.generateFrameNumbers('enemy', { start: 0, end: 3 }),
-      frameRate: 8,
-      repeat: -1
-    });
-    this.enemy.play('enemy-walk');
-
-    // Colliders
-    this.physics.add.collider(this.player, platforms);
-    this.physics.add.collider(this.enemy, platforms);
-
-    // Enemy patrol logic: set initial direction and bounds
-    // Adjust patrol range to your level layout.
-    this.enemyPatrol = {
-      leftX: 1050,
-      rightX: 1350,
-      speed: 60,
-      direction: 1 // 1 = right, -1 = left
-    };
-    this.enemy.setVelocityX(this.enemyPatrol.speed * this.enemyPatrol.direction);
-
-    // Camera follows player
-    this.cameras.main.setBounds(0, 0, this.physics.world.bounds.width, this.physics.world.bounds.height);
-    this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
-
-    // Input
-    this.cursors = this.input.keyboard.createCursorKeys();
-
-    // Optional: space to jump as well
-    this.jumpKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
-
-    // Improve landing: allow small jumps only when touching down
-    this.player.body.setMaxVelocity(250, 600);
-    this.player.body.setDragX(800);
-
-    // Depth ordering (ensure player/enemy above background)
-    bg.setDepth(-10);
-    platforms.setDepth(-1);
-    this.player.setDepth(1);
-    this.enemy.setDepth(1);
-  }
-
-  update(time, delta) {
-    // Player movement
-    const onGround = this.player.body.blocked.down || this.player.body.touching.down;
-
-    // Horizontal movement
-    const left = this.cursors.left.isDown;
-    const right = this.cursors.right.isDown;
-
-    if (left) {
-      this.player.setAccelerationX(-800);
-      this.player.setFlipX(true);
-      if (onGround) this.player.play('player-walk', true);
-    } else if (right) {
-      this.player.setAccelerationX(800);
-      this.player.setFlipX(false);
-      if (onGround) this.player.play('player-walk', true);
-    } else {
-      this.player.setAccelerationX(0);
-      this.player.setVelocityX(this.player.body.velocity.x * 0.9);
-      if (onGround) this.player.play('player-idle', true);
-    }
-
-    // Jump
-    const jumpPressed = Phaser.Input.Keyboard.JustDown(this.cursors.up) || Phaser.Input.Keyboard.JustDown(this.jumpKey);
-    if (jumpPressed && onGround) {
-      this.player.setVelocityY(-380); // Adjust jump strength as needed
-      this.player.play('player-jump', true);
-    }
-
-    if (!onGround && this.player.anims.currentAnim && this.player.anims.currentAnim.key !== 'player-jump') {
-      // Keep jump pose while in air if you prefer
-      this.player.play('player-jump', true);
-    }
-
-    // Enemy patrol: reverse direction at patrol bounds or on edge
-    const patrol = this.enemyPatrol;
-    if (this.enemy.x >= patrol.rightX && patrol.direction === 1) {
-      patrol.direction = -1;
-      this.enemy.setVelocityX(-patrol.speed);
-      this.enemy.setFlipX(true);
-    } else if (this.enemy.x <= patrol.leftX && patrol.direction === -1) {
-      patrol.direction = 1;
-      this.enemy.setVelocityX(patrol.speed);
-      this.enemy.setFlipX(false);
-    }
-
-    // Optional: detect platform edges to flip direction (requires checking for support beneath enemy)
-    // This keeps enemy from walking off platforms if patrol bounds are wide.
-    this._edgeCheckEnemy();
-  }
-
-  _edgeCheckEnemy() {
-    // Raycast down a few pixels ahead of the enemy to detect platform edges.
-    const aheadX = this.enemy.x + (this.enemyPatrol.direction * (this.enemy.width * 0.5));
-    const aheadY = this.enemy.y + (this.enemy.height * 0.6);
-
-    // Get bodies under the point – simple overlap test against static world bounds won't work,
-    // but Arcade Physics has world.collide for bodies. We'll approximate: if enemy is near ground and falling soon, flip.
-    // This is a heuristic; for exact checks you could create invisible sensors.
-    if (this.enemy.body.blocked.down) {
-      // If velocity down is near 0 and there is nothing right beneath ahead point after nudging forward, flip.
-      // We’ll use a small probe: move slightly and check if still grounded next frame. To keep it simple here, skip advanced logic.
-      // Patrol bounds already prevent most falls; edge flip is a minimal safeguard.
-    }
-  }
-}
-
-const config = {
-  type: Phaser.AUTO,
-  width: 800,
-  height: 600,
-  parent: 'game',
-  physics: {
-    default: 'arcade',
-    arcade: {
-      gravity: { y: 700 },
-      debug: false
-    }
-  },
-  scene: [MainScene]
-};
-
-new Phaser.Game(config);
-</script>
+    new Phaser.Game(config);
+  </script>
 </body>
 </html>
