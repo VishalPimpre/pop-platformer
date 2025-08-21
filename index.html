@@ -30,14 +30,14 @@
 
         // If player.png is a sheet → adjust these!
         this.load.spritesheet('player', 'assets/sprites/player.png', {
-          frameWidth: 48,   // CHANGE: must match actual frame width
-          frameHeight: 48   // CHANGE: must match actual frame height
+          frameWidth: 66,   // CHANGE: must match actual frame width
+          frameHeight: 92   // CHANGE: must match actual frame height
         });
 
         // If enemy.png is also sheet
         this.load.spritesheet('enemy', 'assets/sprites/enemy.png', {
-          frameWidth: 32,   // CHANGE: actual width of each frame
-          frameHeight: 32   // CHANGE: actual height
+          frameWidth: 51,   // CHANGE: actual width of each frame
+          frameHeight: 51   // CHANGE: actual height
         });
       }
 
@@ -46,7 +46,7 @@
 
         // Platforms
         this.platforms = this.physics.add.staticGroup();
-        const groundCount = Math.ceil(WORLD_WIDTH / 64); // assume platform.png ~64px wide
+        const groundCount = Math.ceil(WORLD_WIDTH / 70); // assume platform.png ~64px wide
         for (let i=0; i<groundCount; i++) {
           this.platforms.create(i*64+32, WORLD_HEIGHT-20, 'platform').setScale(1).refreshBody();
         }
