@@ -3,128 +3,139 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Phaser 3 Platformer</title>
+  <title>Phaser 3 Platformer Level</title>
+  <!-- Phaser 3 from CDN -->
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.js"></script>
   <style>
     html, body { margin:0; padding:0; background:#111; }
     #game-container { display:flex; align-items:center; justify-content:center; height:100vh; }
+    canvas { box-shadow:0 8px 25px rgba(0,0,0,0.6); border-radius:8px; }
   </style>
 </head>
 <body>
-  <div id="game-container"></div>
-  <script>
-    const GAME_WIDTH = 960;
-    const GAME_HEIGHT = 540;
-    const WORLD_WIDTH = 2400;
-    const WORLD_HEIGHT = 1080;
+<div id="game-container"></div>
+<script>
+const GAME_WIDTH = 960;
+const GAME_HEIGHT = 540;
+const WORLD_WIDTH = 2400;
+const WORLD_HEIGHT = 1080;
 
-    const PLAYER = { speed: 220, jump: 520, spawn: { x: 120, y: WORLD_HEIGHT - 180 } };
-    const ENEMY = { speed: 100 };
+const PLAYER = {
+  speed: 220,
+  jump: 520,
+  spawn: { x: 120, y: WORLD_HEIGHT - 200 }
+};
 
-    class MainScene extends Phaser.Scene {
-      constructor() { super('MainScene'); }
+class MainScene extends Phaser.Scene {
+  constructor() { super('MainScene'); }
 
-      preload() {
-        this.load.image('sky', 'assets/backgrounds/sky.png');
-        this.load.image('platform', 'assets/sprites/platform.png');
+  preload() {
+    // Load local assets from assets/ folder
+    this.load.image('sky', 'assets/backgrounds/sky.png');
+    this.load.image('platform', 'assets/sprites/platform.png');
+    this.load.spritesheet('player', 'assets/sprites/player.png', { frameWidth: 48, frameHeight: 48 });
+    this.load.spritesheet('enemy', 'assets/sprites/enemy.png', { frameWidth: 48, frameHeight: 48 });
+  }
 
-        // If player.png is a sheet → adjust these!
-        this.load.spritesheet('player', 'assets/sprites/player.png', {
-          frameWidth: 66,   // CHANGE: must match actual frame width
-          frameHeight: 92   // CHANGE: must match actual frame height
-        });
+  create() {
+    // --- Background ---
+    this.add.image(WORLD_WIDTH/2, WORLD_HEIGHT/2, 'sky').setScrollFactor(0.5).setScale(3);
 
-        // If enemy.png is also sheet
-        this.load.spritesheet('enemy', 'assets/sprites/enemy.png', {
-          frameWidth: 51,   // CHANGE: actual width of each frame
-          frameHeight: 51   // CHANGE: actual height
-        });
-      }
+    // --- Platforms ---
+    this.platforms = this.physics.add.staticGroup();
+    this.platforms.create(WORLD_WIDTH/2, WORLD_HEIGHT - 20, 'platform').setScale(20, 2).refreshBody();
+    this.platforms.create(420, WORLD_HEIGHT - 180, 'platform').refreshBody();
+    this.platforms.create(760, WORLD_HEIGHT - 270, 'platform').refreshBody();
+    this.platforms.create(1120, WORLD_HEIGHT - 360, 'platform').refreshBody();
+    this.platforms.create(1480, WORLD_HEIGHT - 300, 'platform').refreshBody();
+    this.platforms.create(1800, WORLD_HEIGHT - 220, 'platform').refreshBody();
+    this.platforms.create(2100, WORLD_HEIGHT - 320, 'platform').refreshBody();
 
-      create() {
-        this.add.image(0,0,'sky').setOrigin(0,0).setDisplaySize(WORLD_WIDTH, WORLD_HEIGHT);
+    // --- Player ---
+    this.player = this.physics.add.sprite(PLAYER.spawn.x, PLAYER.spawn.y, 'player');
+    this.player.setBounce(0.1);
+    this.player.setCollideWorldBounds(true);
 
-        // Platforms
-        this.platforms = this.physics.add.staticGroup();
-        const groundCount = Math.ceil(WORLD_WIDTH / 70); // assume platform.png ~64px wide
-        for (let i=0; i<groundCount; i++) {
-          this.platforms.create(i*64+32, WORLD_HEIGHT-20, 'platform').setScale(1).refreshBody();
-        }
-        this.platforms.create(420,  WORLD_HEIGHT - 180, 'platform');
-        this.platforms.create(760,  WORLD_HEIGHT - 270, 'platform');
-        this.platforms.create(1120, WORLD_HEIGHT - 360, 'platform');
-        this.platforms.create(1480, WORLD_HEIGHT - 300, 'platform');
-        this.platforms.create(1800, WORLD_HEIGHT - 220, 'platform');
-        this.platforms.create(2100, WORLD_HEIGHT - 320, 'platform');
+    // Animations
+    this.anims.create({ key: 'idle', frames: [ { key: 'player', frame: 0 } ], frameRate: 10 });
+    this.anims.create({ key: 'left', frames: this.anims.generateFrameNumbers('player', { start: 1, end: 3 }), frameRate: 10, repeat: -1 });
+    this.anims.create({ key: 'right', frames: this.anims.generateFrameNumbers('player', { start: 5, end: 7 }), frameRate: 10, repeat: -1 });
+    this.anims.create({ key: 'jump', frames: [ { key: 'player', frame: 4 } ], frameRate: 10 });
 
-        // Player
-        this.player = this.physics.add.sprite(PLAYER.spawn.x, PLAYER.spawn.y, 'player');
-        this.player.setBounce(0.1).setCollideWorldBounds(true);
-        this.player.body.setGravityY(900);
+    // --- Enemy ---
+    this.enemy = this.physics.add.sprite(750, WORLD_HEIGHT - 400, 'enemy');
+    this.enemy.setCollideWorldBounds(true);
+    this.enemy.setVelocityX(100);
+    this.enemy.direction = 1; // 1 = right, -1 = left
 
-        this.anims.create({ key: 'left', frames: this.anims.generateFrameNumbers('player', { start: 0, end: 3 }), frameRate: 10, repeat: -1 });
-        this.anims.create({ key: 'turn', frames: [ { key: 'player', frame: 4 } ], frameRate: 20 });
-        this.anims.create({ key: 'right', frames: this.anims.generateFrameNumbers('player', { start: 5, end: 8 }), frameRate: 10, repeat: -1 });
+    this.anims.create({ key: 'enemy-walk', frames: this.anims.generateFrameNumbers('enemy', { start: 0, end: 1 }), frameRate: 4, repeat: -1 });
+    this.enemy.anims.play('enemy-walk', true);
 
-        // Enemy
-        this.enemy = this.physics.add.sprite(750, WORLD_HEIGHT - 310, 'enemy');
-        this.enemy.body.setGravityY(900);
-        this.enemy.setCollideWorldBounds(true);
-        this.enemy.patrol = { minX: 650, maxX: 870, speed: ENEMY.speed };
-        this.enemy.setVelocityX(this.enemy.patrol.speed);
+    // Collisions
+    this.physics.add.collider(this.player, this.platforms);
+    this.physics.add.collider(this.enemy, this.platforms);
 
-        this.anims.create({ key: 'enemy-walk', frames: this.anims.generateFrameNumbers('enemy', { start: 0, end: 3 }), frameRate: 6, repeat: -1 });
-        this.enemy.play('enemy-walk');
+    // Camera
+    this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+    this.cameras.main.startFollow(this.player);
 
-        // Physics
-        this.physics.add.collider(this.player, this.platforms);
-        this.physics.add.collider(this.enemy, this.platforms);
+    // Input
+    this.cursors = this.input.keyboard.createCursorKeys();
+    this.keys = this.input.keyboard.addKeys({
+      left: Phaser.Input.Keyboard.KeyCodes.A,
+      right: Phaser.Input.Keyboard.KeyCodes.D,
+      jump: Phaser.Input.Keyboard.KeyCodes.SPACE
+    });
+  }
 
-        this.physics.add.overlap(this.player, this.enemy, () => this.respawnPlayer(), null, this);
-
-        // Camera
-        this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
-        this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
-
-        // Controls
-        this.cursors = this.input.keyboard.createCursorKeys();
-        this.keys = this.input.keyboard.addKeys({ left:Phaser.Input.Keyboard.KeyCodes.A, right:Phaser.Input.Keyboard.KeyCodes.D, jump:Phaser.Input.Keyboard.KeyCodes.SPACE });
-      }
-
-      respawnPlayer() { this.player.setPosition(PLAYER.spawn.x, PLAYER.spawn.y); this.player.setVelocity(0,0); }
-
-      update() {
-        const body = this.player.body;
-        const enemyBody = this.enemy.body;
-
-        if (this.cursors.left.isDown || this.keys.left.isDown) {
-          body.setVelocityX(-PLAYER.speed);
-          this.player.anims.play('left', true);
-        } else if (this.cursors.right.isDown || this.keys.right.isDown) {
-          body.setVelocityX(PLAYER.speed);
-          this.player.anims.play('right', true);
-        } else {
-          body.setVelocityX(0);
-          this.player.anims.play('turn');
-        }
-        if ((this.cursors.up.isDown || this.keys.jump.isDown) && body.blocked.down) {
-          body.setVelocityY(-PLAYER.jump);
-        }
-
-        if (this.enemy.x <= this.enemy.patrol.minX && enemyBody.velocity.x < 0) {
-          enemyBody.setVelocityX(this.enemy.patrol.speed);
-        } else if (this.enemy.x >= this.enemy.patrol.maxX && enemyBody.velocity.x > 0) {
-          enemyBody.setVelocityX(-this.enemy.patrol.speed);
-        }
-      }
+  update() {
+    // --- Player Movement ---
+    if (this.cursors.left.isDown || this.keys.left.isDown) {
+      this.player.setVelocityX(-PLAYER.speed);
+      this.player.anims.play('left', true);
+      this.player.flipX = true;
+    } 
+    else if (this.cursors.right.isDown || this.keys.right.isDown) {
+      this.player.setVelocityX(PLAYER.speed);
+      this.player.anims.play('right', true);
+      this.player.flipX = false;
+    } 
+    else {
+      this.player.setVelocityX(0);
+      this.player.anims.play('idle', true);
     }
 
-    new Phaser.Game({
-      type: Phaser.AUTO,
-      width: GAME_WIDTH, height: GAME_HEIGHT, parent: 'game-container',
-      physics: { default:'arcade', arcade:{ gravity:{ y:0 }, debug:false } },
-      scene: [MainScene]
-    });
-  </script>
+    // Jump
+    if ((this.cursors.up.isDown || this.keys.jump.isDown) && this.player.body.blocked.down) {
+      this.player.setVelocityY(-PLAYER.jump);
+      this.player.anims.play('jump', true);
+    }
+
+    // --- Enemy Patrol Logic ---
+    if (this.enemy.x >= 900) {
+      this.enemy.setVelocityX(-100);
+      this.enemy.flipX = true;
+    } else if (this.enemy.x <= 600) {
+      this.enemy.setVelocityX(100);
+      this.enemy.flipX = false;
+    }
+  }
+}
+
+// Game config
+const config = {
+  type: Phaser.AUTO,
+  width: GAME_WIDTH,
+  height: GAME_HEIGHT,
+  parent: 'game-container',
+  physics: {
+    default: 'arcade',
+    arcade: { gravity: { y: 900 }, debug: false }
+  },
+  scene: [ MainScene ]
+};
+
+new Phaser.Game(config);
+</script>
 </body>
 </html>
